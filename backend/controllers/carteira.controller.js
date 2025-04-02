@@ -1,4 +1,3 @@
-
 // Controller para as operações relacionadas às carteiras
 
 // Criar uma nova carteira
@@ -27,7 +26,9 @@ exports.createWallet = async (req, res) => {
       tipo: 'criacao',
       descricao: `Criou a carteira ${nome}`,
       valor: 0,
-      data: new Date()
+      data: new Date(),
+      carteiraId: result.insertedId,
+      carteiraNome: nome
     });
     
     res.status(201).json({

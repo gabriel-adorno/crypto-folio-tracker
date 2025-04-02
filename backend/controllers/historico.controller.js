@@ -17,7 +17,8 @@ exports.getHistory = async (req, res) => {
       descricao: item.descricao,
       valor: item.valor,
       carteiraId: item.carteiraId,
-      carteiraNome: item.carteiraNome
+      carteiraNome: item.carteiraNome,
+      lucro: item.lucro
     }));
     
     res.json(formattedHistory);

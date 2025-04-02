@@ -3,7 +3,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { HistoryItem } from "@/services/api";
 import { formatCurrency, formatDate } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
-import { ArrowUpCircle, ArrowDownCircle, CircleDollarSign, Wallet } from "lucide-react";
+import { ArrowUpCircle, ArrowDownCircle, CircleDollarSign, Wallet, RefreshCw } from "lucide-react";
 
 interface TransactionListProps {
   transactions: HistoryItem[];
@@ -13,7 +13,8 @@ const TransactionList = ({ transactions }: TransactionListProps) => {
   if (transactions.length === 0) {
     return (
       <div className="text-center py-10 text-muted-foreground">
-        Nenhuma transação encontrada.
+        <p className="mb-4">Nenhuma transação encontrada.</p>
+        <p className="text-sm">Faça operações de depósito, compra ou venda para visualizar seu histórico.</p>
       </div>
     );
   }
@@ -28,6 +29,8 @@ const TransactionList = ({ transactions }: TransactionListProps) => {
         return <CircleDollarSign className="text-crypto-blue" size={18} />;
       case "saque":
         return <Wallet className="text-crypto-orange" size={18} />;
+      case "criacao":
+        return <RefreshCw className="text-muted-foreground" size={18} />;
       default:
         return null;
     }
@@ -43,6 +46,8 @@ const TransactionList = ({ transactions }: TransactionListProps) => {
         return "text-crypto-blue";
       case "saque":
         return "text-crypto-orange";
+      case "criacao":
+        return "text-muted-foreground";
       default:
         return "text-muted-foreground";
     }

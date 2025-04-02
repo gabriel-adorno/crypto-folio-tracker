@@ -25,30 +25,63 @@ async function connectToDatabase() {
     console.log('Connected to MongoDB');
     db = client.db();
     
-    // Create collections if they don't exist
-    if (!(await db.listCollections({ name: 'usuarios' }).hasNext())) {
-      await db.createCollection('usuarios');
-      await db.collection('usuarios').insertOne({
-        saldoReais: 0,
-        aporteTotal: 0
-      });
-      console.log('Usuarios collection created');
-    }
-    
-    if (!(await db.listCollections({ name: 'carteiras' }).hasNext())) {
-      await db.createCollection('carteiras');
-      console.log('Carteiras collection created');
-    }
-    
-    if (!(await db.listCollections({ name: 'historico' }).hasNext())) {
-      await db.createCollection('historico');
-      console.log('Historico collection created');
-    }
+    // Inicializar dados se necessário
+    await initializeData(db);
     
     return db;
   } catch (error) {
     console.error('Failed to connect to MongoDB', error);
     process.exit(1);
+  }
+}
+
+// Inicialização de dados
+async function initializeData(db) {
+  // Create collections if they don't exist
+  if (!(await db.listCollections({ name: 'usuarios' }).hasNext())) {
+    await db.createCollection('usuarios');
+    await db.collection('usuarios').insertOne({
+      saldoReais: 10000,
+      aporteTotal: 0
+    });
+    console.log('Usuarios collection created with initial data');
+  }
+  
+  if (!(await db.listCollections({ name: 'carteiras' }).hasNext())) {
+    await db.createCollection('carteiras');
+    console.log('Carteiras collection created');
+    
+    // Add a sample wallet if none exists
+    const carteirasCount = await db.collection('carteiras').countDocuments();
+    if (carteirasCount === 0) {
+      await db.collection('carteiras').insertOne({
+        nome: "Carteira Principal",
+        ativos: [],
+        saldoTotal: 0,
+        aporteTotal: 0,
+        lucro: 0,
+        percentualLucro: 0,
+        dataCriacao: new Date()
+      });
+      console.log('Sample wallet created');
+    }
+  }
+  
+  if (!(await db.listCollections({ name: 'historico' }).hasNext())) {
+    await db.createCollection('historico');
+    console.log('Historico collection created');
+    
+    // Add sample history if none exists
+    const historicoCount = await db.collection('historico').countDocuments();
+    if (historicoCount === 0) {
+      await db.collection('historico').insertOne({
+        tipo: 'deposito',
+        descricao: 'Depósito inicial em reais',
+        valor: 10000,
+        data: new Date()
+      });
+      console.log('Sample history created');
+    }
   }
 }
 

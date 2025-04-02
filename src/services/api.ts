@@ -38,6 +38,7 @@ export interface HistoryItem {
   valor: number;
   carteiraId?: string;
   carteiraNome?: string;
+  lucro?: number;
 }
 
 export interface ChartData {
@@ -63,54 +64,6 @@ const apiClient = axios.create({
     'Content-Type': 'application/json',
   },
 });
-
-// Mock data for fallback (if API is not running)
-const mockUser: User = {
-  id: "1",
-  saldoReais: 10000,
-  aporteTotal: 8000,
-};
-
-const mockWallets: Wallet[] = [
-  {
-    id: "1",
-    nome: "Carteira Principal",
-    ativos: [
-      { nome: "Bitcoin", quantidade: 0.5, valorUnitario: 250000, valorTotal: 125000, percentual: 65 },
-      { nome: "Ethereum", quantidade: 5, valorUnitario: 13000, valorTotal: 65000, percentual: 30 },
-      { nome: "Solana", quantidade: 10, valorUnitario: 500, valorTotal: 5000, percentual: 5 }
-    ],
-    saldoTotal: 195000,
-    aporteTotal: 150000,
-    lucro: 45000,
-    percentualLucro: 30,
-  },
-  {
-    id: "2",
-    nome: "DeFi",
-    ativos: [
-      { nome: "Aave", quantidade: 20, valorUnitario: 500, valorTotal: 10000, percentual: 40 },
-      { nome: "Uniswap", quantidade: 50, valorUnitario: 250, valorTotal: 12500, percentual: 60 }
-    ],
-    saldoTotal: 22500,
-    aporteTotal: 20000,
-    lucro: 2500,
-    percentualLucro: 12.5,
-  }
-];
-
-const mockHistory: HistoryItem[] = [
-  { id: "1", data: "2023-06-01", tipo: "compra", descricao: "Comprou 0.2 Bitcoin", valor: 50000 },
-  { id: "2", data: "2023-06-15", tipo: "compra", descricao: "Comprou 2 Ethereum", valor: 26000 },
-  { id: "3", data: "2023-07-01", tipo: "venda", descricao: "Vendeu 0.1 Bitcoin", valor: 25000 },
-  { id: "4", data: "2023-07-15", tipo: "deposito", descricao: "Depositou em reais", valor: 5000 },
-  { id: "5", data: "2023-07-30", tipo: "compra", descricao: "Comprou 10 Solana", valor: 5000 },
-  { id: "6", data: "2023-08-10", tipo: "saque", descricao: "Sacou em reais", valor: 2000 },
-  { id: "7", data: "2023-08-20", tipo: "compra", descricao: "Comprou 20 Aave", valor: 10000 },
-  { id: "8", data: "2023-09-05", tipo: "compra", descricao: "Comprou 50 Uniswap", valor: 12500 },
-  { id: "9", data: "2023-09-20", tipo: "compra", descricao: "Comprou 0.3 Bitcoin", valor: 75000 },
-  { id: "10", data: "2023-10-01", tipo: "compra", descricao: "Comprou 3 Ethereum", valor: 39000 },
-];
 
 // Helper function to handle API errors
 const handleApiError = (error: any, fallbackData: any = null) => {
@@ -149,7 +102,7 @@ const api = {
         aporteTotal: response.data.aporteTotal
       };
     } catch (error) {
-      return handleApiError(error, mockUser);
+      return handleApiError(error);
     }
   },
 
@@ -188,19 +141,7 @@ const api = {
       const response = await apiClient.get('/usuario/geral');
       return response.data;
     } catch (error) {
-      // Fallback calculation based on mock data
-      const saldoCarteiras = mockWallets.reduce((sum, wallet) => sum + wallet.saldoTotal, 0);
-      const aporteTotal = mockWallets.reduce((sum, wallet) => sum + wallet.aporteTotal, 0);
-      const lucroTotal = saldoCarteiras - aporteTotal;
-      const percentualLucro = (lucroTotal / aporteTotal) * 100;
-
-      return handleApiError(error, {
-        saldoReais: mockUser.saldoReais,
-        aporteTotal,
-        saldoCarteiras,
-        lucroTotal,
-        percentualLucro,
-      });
+      return handleApiError(error);
     }
   },
 
@@ -211,14 +152,14 @@ const api = {
       return response.data.map((wallet: any) => ({
         id: wallet._id,
         nome: wallet.nome,
-        ativos: wallet.ativos,
+        ativos: wallet.ativos || [],
         saldoTotal: wallet.saldoTotal,
         aporteTotal: wallet.aporteTotal,
         lucro: wallet.lucro,
         percentualLucro: wallet.percentualLucro
       }));
     } catch (error) {
-      return handleApiError(error, mockWallets);
+      return handleApiError(error, []);
     }
   },
 
@@ -228,14 +169,14 @@ const api = {
       return {
         id: response.data._id,
         nome: response.data.nome,
-        ativos: response.data.ativos,
+        ativos: response.data.ativos || [],
         saldoTotal: response.data.saldoTotal,
         aporteTotal: response.data.aporteTotal,
         lucro: response.data.lucro,
         percentualLucro: response.data.percentualLucro
       };
     } catch (error) {
-      return handleApiError(error, mockWallets.find(w => w.id === id));
+      return handleApiError(error);
     }
   },
 
@@ -246,7 +187,7 @@ const api = {
       return {
         id: response.data.id,
         nome: response.data.nome,
-        ativos: response.data.ativos,
+        ativos: response.data.ativos || [],
         saldoTotal: response.data.saldoTotal,
         aporteTotal: response.data.aporteTotal,
         lucro: response.data.lucro,
@@ -275,7 +216,7 @@ const api = {
 
   sellAsset: async (walletId: string, asset: { nome: string; quantidade: number; valorUnitario: number }): Promise<Wallet> => {
     try {
-      const response = await apiClient.post(`/carteira/${walletId}/venda`, asset);
+      await apiClient.post(`/carteira/${walletId}/venda`, asset);
       toast.success(`Venda de ${asset.quantidade} ${asset.nome} realizada com sucesso!`);
       
       // Get updated wallet
@@ -295,7 +236,7 @@ const api = {
       const response = await apiClient.get('/historico');
       return response.data;
     } catch (error) {
-      return handleApiError(error, mockHistory);
+      return handleApiError(error, []);
     }
   },
 
@@ -305,22 +246,7 @@ const api = {
       const response = await apiClient.get(`/graficos/pizza/carteira/${walletId}`);
       return response.data;
     } catch (error) {
-      // Fallback data from mock
-      const wallet = mockWallets.find(w => w.id === walletId);
-      if (!wallet) {
-        return handleApiError(error);
-      }
-      
-      const colors = [
-        '#00e4ca', '#9b87f5', '#ff9332', '#1199fa', '#2ebd85', '#ff4c4c',
-        '#00b8d9', '#6554c0', '#ff8800', '#36b37e', '#ff5630', '#6554c0'
-      ];
-      
-      return handleApiError(error, {
-        labels: wallet.ativos.map(a => a.nome),
-        data: wallet.ativos.map(a => a.percentual),
-        backgroundColor: wallet.ativos.map((_, index) => colors[index % colors.length]),
-      });
+      return handleApiError(error, { labels: [], data: [], backgroundColor: [] });
     }
   },
 
@@ -329,24 +255,7 @@ const api = {
       const response = await apiClient.get('/graficos/pizza/geral');
       return response.data;
     } catch (error) {
-      // Fallback calculation from mock data
-      const totalValue = mockWallets.reduce((sum, wallet) => sum + wallet.saldoTotal, 0);
-      const walletData = mockWallets.map(wallet => ({
-        name: wallet.nome,
-        value: wallet.saldoTotal,
-        percentage: (wallet.saldoTotal / totalValue) * 100
-      }));
-      
-      const colors = [
-        '#00e4ca', '#9b87f5', '#ff9332', '#1199fa', '#2ebd85', '#ff4c4c',
-        '#00b8d9', '#6554c0', '#ff8800', '#36b37e', '#ff5630', '#6554c0'
-      ];
-      
-      return handleApiError(error, {
-        labels: walletData.map(w => w.name),
-        data: walletData.map(w => w.percentage),
-        backgroundColor: walletData.map((_, index) => colors[index % colors.length]),
-      });
+      return handleApiError(error, { labels: [], data: [], backgroundColor: [] });
     }
   },
 
@@ -355,35 +264,12 @@ const api = {
       const response = await apiClient.get(`/graficos/aporte-saldo/carteira/${walletId}`);
       return response.data;
     } catch (error) {
-      // Fallback from mock data
-      const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'];
-      const wallet = mockWallets.find(w => w.id === walletId);
-      
-      if (!wallet) {
-        return handleApiError(error);
-      }
-      
-      const aporteData = [wallet.aporteTotal * 0.3, wallet.aporteTotal * 0.5, wallet.aporteTotal * 0.7, 
-                         wallet.aporteTotal * 0.8, wallet.aporteTotal * 0.9, wallet.aporteTotal];
-      const saldoData = [wallet.aporteTotal * 0.28, wallet.aporteTotal * 0.48, wallet.aporteTotal * 0.75, 
-                        wallet.aporteTotal * 0.9, wallet.aporteTotal * 1.05, wallet.saldoTotal];
-      
-      return handleApiError(error, {
-        labels: months,
+      return handleApiError(error, { 
+        labels: [], 
         datasets: [
-          {
-            label: 'Aporte',
-            data: aporteData,
-            borderColor: '#9b87f5',
-            backgroundColor: 'rgba(155, 135, 245, 0.1)',
-          },
-          {
-            label: 'Saldo',
-            data: saldoData,
-            borderColor: '#00e4ca',
-            backgroundColor: 'rgba(0, 228, 202, 0.1)',
-          }
-        ]
+          { label: 'Aporte', data: [], borderColor: '#9b87f5', backgroundColor: 'rgba(155, 135, 245, 0.1)' },
+          { label: 'Saldo', data: [], borderColor: '#00e4ca', backgroundColor: 'rgba(0, 228, 202, 0.1)' }
+        ] 
       });
     }
   },
@@ -393,32 +279,12 @@ const api = {
       const response = await apiClient.get('/graficos/aporte-saldo/geral');
       return response.data;
     } catch (error) {
-      // Fallback from mock data
-      const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'];
-      const totalAporte = mockWallets.reduce((sum, wallet) => sum + wallet.aporteTotal, 0);
-      const totalSaldo = mockWallets.reduce((sum, wallet) => sum + wallet.saldoTotal, 0);
-      
-      const aporteData = [totalAporte * 0.3, totalAporte * 0.5, totalAporte * 0.7, 
-                         totalAporte * 0.8, totalAporte * 0.9, totalAporte];
-      const saldoData = [totalAporte * 0.28, totalAporte * 0.48, totalAporte * 0.75, 
-                        totalAporte * 0.9, totalAporte * 1.05, totalSaldo];
-      
-      return handleApiError(error, {
-        labels: months,
+      return handleApiError(error, { 
+        labels: [], 
         datasets: [
-          {
-            label: 'Aporte Total',
-            data: aporteData,
-            borderColor: '#9b87f5',
-            backgroundColor: 'rgba(155, 135, 245, 0.1)',
-          },
-          {
-            label: 'Saldo Total',
-            data: saldoData,
-            borderColor: '#00e4ca',
-            backgroundColor: 'rgba(0, 228, 202, 0.1)',
-          }
-        ]
+          { label: 'Aporte Total', data: [], borderColor: '#9b87f5', backgroundColor: 'rgba(155, 135, 245, 0.1)' },
+          { label: 'Saldo Total', data: [], borderColor: '#00e4ca', backgroundColor: 'rgba(0, 228, 202, 0.1)' }
+        ] 
       });
     }
   }
