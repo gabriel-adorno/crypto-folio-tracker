@@ -1,7 +1,11 @@
 
+import axios from 'axios';
 import { toast } from "sonner";
 
-// Since we're mocking the backend for now, we'll use these types
+// Define the API base URL
+const API_URL = 'http://localhost:5000';
+
+// Types
 export interface User {
   id: string;
   saldoReais: number;
@@ -29,9 +33,11 @@ export interface Wallet {
 export interface HistoryItem {
   id: string;
   data: string;
-  tipo: 'compra' | 'venda' | 'deposito' | 'saque';
+  tipo: 'compra' | 'venda' | 'deposito' | 'saque' | 'criacao';
   descricao: string;
   valor: number;
+  carteiraId?: string;
+  carteiraNome?: string;
 }
 
 export interface ChartData {
@@ -50,7 +56,15 @@ export interface LineChartData {
   }>;
 }
 
-// Mock data
+// Create an axios instance
+const apiClient = axios.create({
+  baseURL: API_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Mock data for fallback (if API is not running)
 const mockUser: User = {
   id: "1",
   saldoReais: 10000,
@@ -98,41 +112,69 @@ const mockHistory: HistoryItem[] = [
   { id: "10", data: "2023-10-01", tipo: "compra", descricao: "Comprou 3 Ethereum", valor: 39000 },
 ];
 
+// Helper function to handle API errors
+const handleApiError = (error: any, fallbackData: any = null) => {
+  console.error('API Error:', error);
+  
+  let errorMessage = 'Erro na comunicação com o servidor';
+  
+  if (error.response) {
+    // The request was made and the server responded with a status code
+    errorMessage = error.response.data?.error || `Erro ${error.response.status}`;
+  } else if (error.request) {
+    // The request was made but no response was received
+    errorMessage = 'Servidor não respondeu. Verifique se o backend está em execução.';
+  }
+  
+  toast.error(errorMessage);
+  
+  // Return fallback data if provided
+  if (fallbackData !== null) {
+    console.warn('Using mock data as fallback');
+    return Promise.resolve(fallbackData);
+  }
+  
+  return Promise.reject(error);
+};
+
 // API methods
 const api = {
   // User endpoints
   getUser: async (): Promise<User> => {
-    // In a real app, this would be a fetch call to the backend
-    return new Promise((resolve) => {
-      setTimeout(() => resolve(mockUser), 500);
-    });
+    try {
+      const response = await apiClient.get('/usuario');
+      return {
+        id: response.data._id,
+        saldoReais: response.data.saldoReais,
+        aporteTotal: response.data.aporteTotal
+      };
+    } catch (error) {
+      return handleApiError(error, mockUser);
+    }
   },
 
   deposit: async (amount: number): Promise<User> => {
-    // Simulate API call
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        mockUser.saldoReais += amount;
-        toast.success(`Depósito de R$ ${amount.toLocaleString()} realizado com sucesso!`);
-        resolve(mockUser);
-      }, 500);
-    });
+    try {
+      const response = await apiClient.post('/usuario/deposito', { valor: amount });
+      toast.success(`Depósito de R$ ${amount.toLocaleString()} realizado com sucesso!`);
+      
+      // Get updated user data
+      return await api.getUser();
+    } catch (error) {
+      return handleApiError(error);
+    }
   },
 
   withdraw: async (amount: number): Promise<User> => {
-    // Simulate API call
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        if (amount > mockUser.saldoReais) {
-          toast.error("Saldo insuficiente para saque!");
-          reject(new Error("Saldo insuficiente"));
-          return;
-        }
-        mockUser.saldoReais -= amount;
-        toast.success(`Saque de R$ ${amount.toLocaleString()} realizado com sucesso!`);
-        resolve(mockUser);
-      }, 500);
-    });
+    try {
+      const response = await apiClient.post('/usuario/saque', { valor: amount });
+      toast.success(`Saque de R$ ${amount.toLocaleString()} realizado com sucesso!`);
+      
+      // Get updated user data
+      return await api.getUser();
+    } catch (error) {
+      return handleApiError(error);
+    }
   },
 
   getUserOverview: async (): Promise<{
@@ -142,327 +184,243 @@ const api = {
     lucroTotal: number;
     percentualLucro: number;
   }> => {
-    // Simulate API call
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const saldoCarteiras = mockWallets.reduce((sum, wallet) => sum + wallet.saldoTotal, 0);
-        const aporteTotal = mockWallets.reduce((sum, wallet) => sum + wallet.aporteTotal, 0);
-        const lucroTotal = saldoCarteiras - aporteTotal;
-        const percentualLucro = (lucroTotal / aporteTotal) * 100;
+    try {
+      const response = await apiClient.get('/usuario/geral');
+      return response.data;
+    } catch (error) {
+      // Fallback calculation based on mock data
+      const saldoCarteiras = mockWallets.reduce((sum, wallet) => sum + wallet.saldoTotal, 0);
+      const aporteTotal = mockWallets.reduce((sum, wallet) => sum + wallet.aporteTotal, 0);
+      const lucroTotal = saldoCarteiras - aporteTotal;
+      const percentualLucro = (lucroTotal / aporteTotal) * 100;
 
-        resolve({
-          saldoReais: mockUser.saldoReais,
-          aporteTotal,
-          saldoCarteiras,
-          lucroTotal,
-          percentualLucro,
-        });
-      }, 500);
-    });
+      return handleApiError(error, {
+        saldoReais: mockUser.saldoReais,
+        aporteTotal,
+        saldoCarteiras,
+        lucroTotal,
+        percentualLucro,
+      });
+    }
   },
 
   // Wallet endpoints
   getWallets: async (): Promise<Wallet[]> => {
-    return new Promise((resolve) => {
-      setTimeout(() => resolve(mockWallets), 500);
-    });
+    try {
+      const response = await apiClient.get('/carteira');
+      return response.data.map((wallet: any) => ({
+        id: wallet._id,
+        nome: wallet.nome,
+        ativos: wallet.ativos,
+        saldoTotal: wallet.saldoTotal,
+        aporteTotal: wallet.aporteTotal,
+        lucro: wallet.lucro,
+        percentualLucro: wallet.percentualLucro
+      }));
+    } catch (error) {
+      return handleApiError(error, mockWallets);
+    }
   },
 
   getWallet: async (id: string): Promise<Wallet | undefined> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const wallet = mockWallets.find(w => w.id === id);
-        resolve(wallet);
-      }, 500);
-    });
+    try {
+      const response = await apiClient.get(`/carteira/${id}`);
+      return {
+        id: response.data._id,
+        nome: response.data.nome,
+        ativos: response.data.ativos,
+        saldoTotal: response.data.saldoTotal,
+        aporteTotal: response.data.aporteTotal,
+        lucro: response.data.lucro,
+        percentualLucro: response.data.percentualLucro
+      };
+    } catch (error) {
+      return handleApiError(error, mockWallets.find(w => w.id === id));
+    }
   },
 
   createWallet: async (name: string): Promise<Wallet> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const newWallet: Wallet = {
-          id: `${mockWallets.length + 1}`,
-          nome: name,
-          ativos: [],
-          saldoTotal: 0,
-          aporteTotal: 0,
-          lucro: 0,
-          percentualLucro: 0,
-        };
-        mockWallets.push(newWallet);
-        toast.success(`Carteira "${name}" criada com sucesso!`);
-        resolve(newWallet);
-      }, 500);
-    });
+    try {
+      const response = await apiClient.post('/carteira', { nome: name });
+      toast.success(`Carteira "${name}" criada com sucesso!`);
+      return {
+        id: response.data.id,
+        nome: response.data.nome,
+        ativos: response.data.ativos,
+        saldoTotal: response.data.saldoTotal,
+        aporteTotal: response.data.aporteTotal,
+        lucro: response.data.lucro,
+        percentualLucro: response.data.percentualLucro
+      };
+    } catch (error) {
+      return handleApiError(error);
+    }
   },
 
   addAsset: async (walletId: string, asset: { nome: string; quantidade: number; valorUnitario: number }): Promise<Wallet> => {
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        const walletIndex = mockWallets.findIndex(w => w.id === walletId);
-        if (walletIndex === -1) {
-          toast.error("Carteira não encontrada!");
-          reject(new Error("Carteira não encontrada"));
-          return;
-        }
-
-        const wallet = mockWallets[walletIndex];
-        const valorTotal = asset.quantidade * asset.valorUnitario;
-
-        if (valorTotal > mockUser.saldoReais) {
-          toast.error("Saldo em reais insuficiente para este aporte!");
-          reject(new Error("Saldo insuficiente"));
-          return;
-        }
-
-        // Update user balance
-        mockUser.saldoReais -= valorTotal;
-        mockUser.aporteTotal += valorTotal;
-
-        // Update or add asset
-        const existingAssetIndex = wallet.ativos.findIndex(a => a.nome === asset.nome);
-        if (existingAssetIndex >= 0) {
-          const existingAsset = wallet.ativos[existingAssetIndex];
-          const newQuantity = existingAsset.quantidade + asset.quantidade;
-          const newTotal = existingAsset.valorTotal + valorTotal;
-          const newAvgPrice = newTotal / newQuantity;
-          
-          wallet.ativos[existingAssetIndex] = {
-            ...existingAsset,
-            quantidade: newQuantity,
-            valorUnitario: newAvgPrice,
-            valorTotal: newTotal,
-          };
-        } else {
-          wallet.ativos.push({
-            nome: asset.nome,
-            quantidade: asset.quantidade,
-            valorUnitario: asset.valorUnitario,
-            valorTotal,
-            percentual: 0,
-          });
-        }
-
-        // Update wallet totals
-        wallet.aporteTotal += valorTotal;
-        wallet.saldoTotal += valorTotal;
-
-        // Recalculate percentages
-        wallet.ativos.forEach(a => {
-          a.percentual = (a.valorTotal / wallet.saldoTotal) * 100;
-        });
-
-        // Add to history
-        mockHistory.unshift({
-          id: `${mockHistory.length + 1}`,
-          data: new Date().toISOString().split('T')[0],
-          tipo: 'compra',
-          descricao: `Comprou ${asset.quantidade} ${asset.nome}`,
-          valor: valorTotal,
-        });
-
-        toast.success(`Compra de ${asset.quantidade} ${asset.nome} realizada com sucesso!`);
-        resolve(wallet);
-      }, 500);
-    });
+    try {
+      await apiClient.post(`/carteira/${walletId}/aporte`, asset);
+      toast.success(`Compra de ${asset.quantidade} ${asset.nome} realizada com sucesso!`);
+      
+      // Get updated wallet
+      const updatedWallet = await api.getWallet(walletId);
+      if (!updatedWallet) {
+        throw new Error('Falha ao atualizar carteira');
+      }
+      return updatedWallet;
+    } catch (error) {
+      return handleApiError(error);
+    }
   },
 
   sellAsset: async (walletId: string, asset: { nome: string; quantidade: number; valorUnitario: number }): Promise<Wallet> => {
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        const walletIndex = mockWallets.findIndex(w => w.id === walletId);
-        if (walletIndex === -1) {
-          toast.error("Carteira não encontrada!");
-          reject(new Error("Carteira não encontrada"));
-          return;
-        }
-
-        const wallet = mockWallets[walletIndex];
-        const existingAssetIndex = wallet.ativos.findIndex(a => a.nome === asset.nome);
-
-        if (existingAssetIndex === -1) {
-          toast.error(`Ativo ${asset.nome} não encontrado na carteira!`);
-          reject(new Error("Ativo não encontrado"));
-          return;
-        }
-
-        const existingAsset = wallet.ativos[existingAssetIndex];
-        if (existingAsset.quantidade < asset.quantidade) {
-          toast.error(`Quantidade insuficiente de ${asset.nome} para venda!`);
-          reject(new Error("Quantidade insuficiente"));
-          return;
-        }
-
-        const valorVenda = asset.quantidade * asset.valorUnitario;
-        const valorCusto = asset.quantidade * existingAsset.valorUnitario;
-        const lucroVenda = valorVenda - valorCusto;
-
-        // Update user balance
-        mockUser.saldoReais += valorVenda;
-
-        // Update asset
-        existingAsset.quantidade -= asset.quantidade;
-        existingAsset.valorTotal = existingAsset.quantidade * existingAsset.valorUnitario;
-
-        if (existingAsset.quantidade === 0) {
-          wallet.ativos.splice(existingAssetIndex, 1);
-        }
-
-        // Update wallet totals
-        wallet.saldoTotal = wallet.ativos.reduce((sum, a) => sum + a.valorTotal, 0);
-        wallet.lucro = wallet.saldoTotal - wallet.aporteTotal;
-        wallet.percentualLucro = wallet.aporteTotal > 0 ? (wallet.lucro / wallet.aporteTotal) * 100 : 0;
-
-        // Recalculate percentages
-        if (wallet.saldoTotal > 0) {
-          wallet.ativos.forEach(a => {
-            a.percentual = (a.valorTotal / wallet.saldoTotal) * 100;
-          });
-        }
-
-        // Add to history
-        mockHistory.unshift({
-          id: `${mockHistory.length + 1}`,
-          data: new Date().toISOString().split('T')[0],
-          tipo: 'venda',
-          descricao: `Vendeu ${asset.quantidade} ${asset.nome}`,
-          valor: valorVenda,
-        });
-
-        const resultMessage = lucroVenda >= 0 
-          ? `Venda realizada com lucro de R$ ${lucroVenda.toLocaleString()}` 
-          : `Venda realizada com prejuízo de R$ ${Math.abs(lucroVenda).toLocaleString()}`;
-        
-        toast.success(`Venda de ${asset.quantidade} ${asset.nome} realizada! ${resultMessage}`);
-        resolve(wallet);
-      }, 500);
-    });
+    try {
+      const response = await apiClient.post(`/carteira/${walletId}/venda`, asset);
+      toast.success(`Venda de ${asset.quantidade} ${asset.nome} realizada com sucesso!`);
+      
+      // Get updated wallet
+      const updatedWallet = await api.getWallet(walletId);
+      if (!updatedWallet) {
+        throw new Error('Falha ao atualizar carteira');
+      }
+      return updatedWallet;
+    } catch (error) {
+      return handleApiError(error);
+    }
   },
 
   // History endpoint
   getHistory: async (): Promise<HistoryItem[]> => {
-    return new Promise((resolve) => {
-      setTimeout(() => resolve([...mockHistory]), 500);
-    });
+    try {
+      const response = await apiClient.get('/historico');
+      return response.data;
+    } catch (error) {
+      return handleApiError(error, mockHistory);
+    }
   },
 
   // Chart endpoints
   getWalletPieChart: async (walletId: string): Promise<ChartData> => {
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        const wallet = mockWallets.find(w => w.id === walletId);
-        if (!wallet) {
-          reject(new Error("Carteira não encontrada"));
-          return;
-        }
-
-        const colors = [
-          '#00e4ca', '#9b87f5', '#ff9332', '#1199fa', '#2ebd85', '#ff4c4c',
-          '#00b8d9', '#6554c0', '#ff8800', '#36b37e', '#ff5630', '#6554c0'
-        ];
-
-        resolve({
-          labels: wallet.ativos.map(a => a.nome),
-          data: wallet.ativos.map(a => a.percentual),
-          backgroundColor: wallet.ativos.map((_, index) => colors[index % colors.length]),
-        });
-      }, 500);
-    });
+    try {
+      const response = await apiClient.get(`/graficos/pizza/carteira/${walletId}`);
+      return response.data;
+    } catch (error) {
+      // Fallback data from mock
+      const wallet = mockWallets.find(w => w.id === walletId);
+      if (!wallet) {
+        return handleApiError(error);
+      }
+      
+      const colors = [
+        '#00e4ca', '#9b87f5', '#ff9332', '#1199fa', '#2ebd85', '#ff4c4c',
+        '#00b8d9', '#6554c0', '#ff8800', '#36b37e', '#ff5630', '#6554c0'
+      ];
+      
+      return handleApiError(error, {
+        labels: wallet.ativos.map(a => a.nome),
+        data: wallet.ativos.map(a => a.percentual),
+        backgroundColor: wallet.ativos.map((_, index) => colors[index % colors.length]),
+      });
+    }
   },
 
   getGeneralPieChart: async (): Promise<ChartData> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const totalValue = mockWallets.reduce((sum, wallet) => sum + wallet.saldoTotal, 0);
-        const walletData = mockWallets.map(wallet => ({
-          name: wallet.nome,
-          value: wallet.saldoTotal,
-          percentage: (wallet.saldoTotal / totalValue) * 100
-        }));
-
-        const colors = [
-          '#00e4ca', '#9b87f5', '#ff9332', '#1199fa', '#2ebd85', '#ff4c4c',
-          '#00b8d9', '#6554c0', '#ff8800', '#36b37e', '#ff5630', '#6554c0'
-        ];
-
-        resolve({
-          labels: walletData.map(w => w.name),
-          data: walletData.map(w => w.percentage),
-          backgroundColor: walletData.map((_, index) => colors[index % colors.length]),
-        });
-      }, 500);
-    });
+    try {
+      const response = await apiClient.get('/graficos/pizza/geral');
+      return response.data;
+    } catch (error) {
+      // Fallback calculation from mock data
+      const totalValue = mockWallets.reduce((sum, wallet) => sum + wallet.saldoTotal, 0);
+      const walletData = mockWallets.map(wallet => ({
+        name: wallet.nome,
+        value: wallet.saldoTotal,
+        percentage: (wallet.saldoTotal / totalValue) * 100
+      }));
+      
+      const colors = [
+        '#00e4ca', '#9b87f5', '#ff9332', '#1199fa', '#2ebd85', '#ff4c4c',
+        '#00b8d9', '#6554c0', '#ff8800', '#36b37e', '#ff5630', '#6554c0'
+      ];
+      
+      return handleApiError(error, {
+        labels: walletData.map(w => w.name),
+        data: walletData.map(w => w.percentage),
+        backgroundColor: walletData.map((_, index) => colors[index % colors.length]),
+      });
+    }
   },
 
   getWalletPerformanceChart: async (walletId: string): Promise<LineChartData> => {
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        const wallet = mockWallets.find(w => w.id === walletId);
-        if (!wallet) {
-          reject(new Error("Carteira não encontrada"));
-          return;
-        }
-
-        // Generate mock data for 6 months
-        const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'];
-        const aporteData = [wallet.aporteTotal * 0.3, wallet.aporteTotal * 0.5, wallet.aporteTotal * 0.7, 
-                           wallet.aporteTotal * 0.8, wallet.aporteTotal * 0.9, wallet.aporteTotal];
-        const saldoData = [wallet.aporteTotal * 0.28, wallet.aporteTotal * 0.48, wallet.aporteTotal * 0.75, 
-                          wallet.aporteTotal * 0.9, wallet.aporteTotal * 1.05, wallet.saldoTotal];
-
-        resolve({
-          labels: months,
-          datasets: [
-            {
-              label: 'Aporte',
-              data: aporteData,
-              borderColor: '#9b87f5',
-              backgroundColor: 'rgba(155, 135, 245, 0.1)',
-            },
-            {
-              label: 'Saldo',
-              data: saldoData,
-              borderColor: '#00e4ca',
-              backgroundColor: 'rgba(0, 228, 202, 0.1)',
-            }
-          ]
-        });
-      }, 500);
-    });
+    try {
+      const response = await apiClient.get(`/graficos/aporte-saldo/carteira/${walletId}`);
+      return response.data;
+    } catch (error) {
+      // Fallback from mock data
+      const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'];
+      const wallet = mockWallets.find(w => w.id === walletId);
+      
+      if (!wallet) {
+        return handleApiError(error);
+      }
+      
+      const aporteData = [wallet.aporteTotal * 0.3, wallet.aporteTotal * 0.5, wallet.aporteTotal * 0.7, 
+                         wallet.aporteTotal * 0.8, wallet.aporteTotal * 0.9, wallet.aporteTotal];
+      const saldoData = [wallet.aporteTotal * 0.28, wallet.aporteTotal * 0.48, wallet.aporteTotal * 0.75, 
+                        wallet.aporteTotal * 0.9, wallet.aporteTotal * 1.05, wallet.saldoTotal];
+      
+      return handleApiError(error, {
+        labels: months,
+        datasets: [
+          {
+            label: 'Aporte',
+            data: aporteData,
+            borderColor: '#9b87f5',
+            backgroundColor: 'rgba(155, 135, 245, 0.1)',
+          },
+          {
+            label: 'Saldo',
+            data: saldoData,
+            borderColor: '#00e4ca',
+            backgroundColor: 'rgba(0, 228, 202, 0.1)',
+          }
+        ]
+      });
+    }
   },
 
   getGeneralPerformanceChart: async (): Promise<LineChartData> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        // Generate mock data for 6 months
-        const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'];
-        const totalAporte = mockWallets.reduce((sum, wallet) => sum + wallet.aporteTotal, 0);
-        const totalSaldo = mockWallets.reduce((sum, wallet) => sum + wallet.saldoTotal, 0);
-        
-        const aporteData = [totalAporte * 0.3, totalAporte * 0.5, totalAporte * 0.7, 
-                           totalAporte * 0.8, totalAporte * 0.9, totalAporte];
-        const saldoData = [totalAporte * 0.28, totalAporte * 0.48, totalAporte * 0.75, 
-                          totalAporte * 0.9, totalAporte * 1.05, totalSaldo];
-
-        resolve({
-          labels: months,
-          datasets: [
-            {
-              label: 'Aporte Total',
-              data: aporteData,
-              borderColor: '#9b87f5',
-              backgroundColor: 'rgba(155, 135, 245, 0.1)',
-            },
-            {
-              label: 'Saldo Total',
-              data: saldoData,
-              borderColor: '#00e4ca',
-              backgroundColor: 'rgba(0, 228, 202, 0.1)',
-            }
-          ]
-        });
-      }, 500);
-    });
+    try {
+      const response = await apiClient.get('/graficos/aporte-saldo/geral');
+      return response.data;
+    } catch (error) {
+      // Fallback from mock data
+      const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'];
+      const totalAporte = mockWallets.reduce((sum, wallet) => sum + wallet.aporteTotal, 0);
+      const totalSaldo = mockWallets.reduce((sum, wallet) => sum + wallet.saldoTotal, 0);
+      
+      const aporteData = [totalAporte * 0.3, totalAporte * 0.5, totalAporte * 0.7, 
+                         totalAporte * 0.8, totalAporte * 0.9, totalAporte];
+      const saldoData = [totalAporte * 0.28, totalAporte * 0.48, totalAporte * 0.75, 
+                        totalAporte * 0.9, totalAporte * 1.05, totalSaldo];
+      
+      return handleApiError(error, {
+        labels: months,
+        datasets: [
+          {
+            label: 'Aporte Total',
+            data: aporteData,
+            borderColor: '#9b87f5',
+            backgroundColor: 'rgba(155, 135, 245, 0.1)',
+          },
+          {
+            label: 'Saldo Total',
+            data: saldoData,
+            borderColor: '#00e4ca',
+            backgroundColor: 'rgba(0, 228, 202, 0.1)',
+          }
+        ]
+      });
+    }
   }
 };
 
