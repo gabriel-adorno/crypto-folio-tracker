@@ -1,3 +1,4 @@
+
 // Controller para as operações relacionadas às carteiras
 
 // Criar uma nova carteira
@@ -54,14 +55,17 @@ exports.addAsset = async (req, res) => {
     }
     
     // Buscar a carteira
-    const wallet = await req.db.collection('carteiras').findOne({ _id: new req.ObjectId(id) });
+    const wallet = await req.db.collection('carteiras').findOne({ 
+      _id: new req.ObjectId(id),
+      userId: req.userId
+    });
     
     if (!wallet) {
       return res.status(404).json({ error: 'Carteira não encontrada' });
     }
     
     // Buscar usuário para verificar saldo
-    const user = await req.db.collection('usuarios').findOne({});
+    const user = await req.db.collection('usuarios').findOne({ _id: new req.ObjectId(req.userId) });
     
     const valorTotal = quantidade * valorUnitario;
     
@@ -69,9 +73,15 @@ exports.addAsset = async (req, res) => {
       return res.status(400).json({ error: 'Saldo em reais insuficiente para este aporte' });
     }
     
+    // Verificar se a criptomoeda existe na tabela de criptomoedas
+    const cryptoData = await req.db.collection('criptomoedas').findOne({ nome });
+    if (!cryptoData) {
+      return res.status(404).json({ error: 'Criptomoeda não encontrada na base de dados' });
+    }
+    
     // Atualizar saldo do usuário
     await req.db.collection('usuarios').updateOne(
-      {},
+      { _id: new req.ObjectId(req.userId) },
       { 
         $inc: { 
           saldoReais: -valorTotal,
@@ -96,7 +106,8 @@ exports.addAsset = async (req, res) => {
         ...existingAsset,
         quantidade: newQuantity,
         valorUnitario: newAvgPrice,
-        valorTotal: newTotal
+        valorTotal: newTotal,
+        precoAtual: cryptoData.precoAtual
       };
     } else {
       // Adicionar novo ativo
@@ -105,19 +116,28 @@ exports.addAsset = async (req, res) => {
         quantidade,
         valorUnitario,
         valorTotal,
-        percentual: 0
+        percentual: 0,
+        precoAtual: cryptoData.precoAtual
       });
     }
     
+    // Calcular o valor atual total dos ativos com base nos preços atuais
+    const saldoAtualTotal = updatedAtivos.reduce((total, ativo) => {
+      return total + (ativo.quantidade * ativo.precoAtual);
+    }, 0);
+    
     // Atualizar totais da carteira
     const newAporteTotal = wallet.aporteTotal + valorTotal;
-    const newSaldoTotal = wallet.saldoTotal + valorTotal;
     
-    // Recalcular percentuais
+    // Recalcular percentuais com base no saldo atual total
     updatedAtivos = updatedAtivos.map(ativo => ({
       ...ativo,
-      percentual: (ativo.valorTotal / newSaldoTotal) * 100
+      percentual: (ativo.quantidade * ativo.precoAtual / saldoAtualTotal) * 100
     }));
+    
+    // Calcular lucro e percentual de lucro
+    const lucro = saldoAtualTotal - newAporteTotal;
+    const percentualLucro = newAporteTotal > 0 ? (lucro / newAporteTotal) * 100 : 0;
     
     // Atualizar a carteira
     await req.db.collection('carteiras').updateOne(
@@ -125,16 +145,17 @@ exports.addAsset = async (req, res) => {
       { 
         $set: { 
           ativos: updatedAtivos,
-          saldoTotal: newSaldoTotal,
+          saldoTotal: saldoAtualTotal,
           aporteTotal: newAporteTotal,
-          lucro: newSaldoTotal - newAporteTotal,
-          percentualLucro: ((newSaldoTotal - newAporteTotal) / newAporteTotal) * 100
+          lucro: lucro,
+          percentualLucro: percentualLucro
         } 
       }
     );
     
     // Registrar no histórico
     await req.db.collection('historico').insertOne({
+      userId: req.userId,
       tipo: 'compra',
       descricao: `Comprou ${quantidade} ${nome}`,
       valor: valorTotal,
@@ -164,7 +185,10 @@ exports.sellAsset = async (req, res) => {
     }
     
     // Buscar a carteira
-    const wallet = await req.db.collection('carteiras').findOne({ _id: new req.ObjectId(id) });
+    const wallet = await req.db.collection('carteiras').findOne({ 
+      _id: new req.ObjectId(id),
+      userId: req.userId
+    });
     
     if (!wallet) {
       return res.status(404).json({ error: 'Carteira não encontrada' });
@@ -189,7 +213,7 @@ exports.sellAsset = async (req, res) => {
     
     // Atualizar saldo do usuário
     await req.db.collection('usuarios').updateOne(
-      {},
+      { _id: new req.ObjectId(req.userId) },
       { $inc: { saldoReais: valorVenda } }
     );
     
@@ -206,16 +230,22 @@ exports.sellAsset = async (req, res) => {
       updatedAtivos = updatedAtivos.filter((_, index) => index !== existingAssetIndex);
     }
     
-    // Recalcular totais da carteira
-    const newSaldoTotal = updatedAtivos.reduce((sum, a) => sum + a.valorTotal, 0);
+    // Recalcular valor atual total dos ativos com base nos preços atuais
+    const saldoAtualTotal = updatedAtivos.reduce((total, ativo) => {
+      return total + (ativo.quantidade * ativo.precoAtual);
+    }, 0);
     
-    // Recalcular percentuais
-    if (newSaldoTotal > 0) {
+    // Recalcular percentuais com base no saldo atual total
+    if (saldoAtualTotal > 0) {
       updatedAtivos = updatedAtivos.map(ativo => ({
         ...ativo,
-        percentual: (ativo.valorTotal / newSaldoTotal) * 100
+        percentual: (ativo.quantidade * ativo.precoAtual / saldoAtualTotal) * 100
       }));
     }
+    
+    // Calcular o lucro e percentual de lucro
+    const lucro = saldoAtualTotal - wallet.aporteTotal;
+    const percentualLucro = wallet.aporteTotal > 0 ? (lucro / wallet.aporteTotal) * 100 : 0;
     
     // Atualizar a carteira
     await req.db.collection('carteiras').updateOne(
@@ -223,15 +253,16 @@ exports.sellAsset = async (req, res) => {
       { 
         $set: { 
           ativos: updatedAtivos,
-          saldoTotal: newSaldoTotal,
-          lucro: newSaldoTotal - wallet.aporteTotal,
-          percentualLucro: wallet.aporteTotal > 0 ? ((newSaldoTotal - wallet.aporteTotal) / wallet.aporteTotal) * 100 : 0
+          saldoTotal: saldoAtualTotal,
+          lucro: lucro,
+          percentualLucro: percentualLucro
         } 
       }
     );
     
     // Registrar no histórico
     await req.db.collection('historico').insertOne({
+      userId: req.userId,
       tipo: 'venda',
       descricao: `Vendeu ${quantidade} ${nome}`,
       valor: valorVenda,
@@ -256,13 +287,94 @@ exports.sellAsset = async (req, res) => {
   }
 };
 
+// Atualizar preços e valores das carteiras
+exports.updateWalletPrices = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Buscar a carteira
+    const wallet = await req.db.collection('carteiras').findOne({ 
+      _id: new req.ObjectId(id),
+      userId: req.userId
+    });
+    
+    if (!wallet) {
+      return res.status(404).json({ error: 'Carteira não encontrada' });
+    }
+    
+    if (!wallet.ativos || wallet.ativos.length === 0) {
+      return res.json(wallet);
+    }
+    
+    // Atualizar preços de cada ativo com base na tabela de criptomoedas
+    let updatedAtivos = [];
+    
+    for (const ativo of wallet.ativos) {
+      // Buscar preço atual na tabela de criptomoedas
+      const cryptoData = await req.db.collection('criptomoedas').findOne({ nome: ativo.nome });
+      
+      if (cryptoData) {
+        updatedAtivos.push({
+          ...ativo,
+          precoAtual: cryptoData.precoAtual,
+          valorAtual: ativo.quantidade * cryptoData.precoAtual
+        });
+      } else {
+        // Manter o preço anterior se não encontrar
+        updatedAtivos.push(ativo);
+      }
+    }
+    
+    // Calcular o valor atual total dos ativos com base nos preços atuais
+    const saldoAtualTotal = updatedAtivos.reduce((total, ativo) => {
+      return total + (ativo.quantidade * ativo.precoAtual);
+    }, 0);
+    
+    // Recalcular percentuais
+    if (saldoAtualTotal > 0) {
+      updatedAtivos = updatedAtivos.map(ativo => ({
+        ...ativo,
+        percentual: (ativo.quantidade * ativo.precoAtual / saldoAtualTotal) * 100
+      }));
+    }
+    
+    // Calcular lucro e percentual de lucro
+    const lucro = saldoAtualTotal - wallet.aporteTotal;
+    const percentualLucro = wallet.aporteTotal > 0 ? (lucro / wallet.aporteTotal) * 100 : 0;
+    
+    // Atualizar a carteira
+    await req.db.collection('carteiras').updateOne(
+      { _id: new req.ObjectId(id) },
+      { 
+        $set: { 
+          ativos: updatedAtivos,
+          saldoTotal: saldoAtualTotal,
+          lucro: lucro,
+          percentualLucro: percentualLucro,
+          ultimaAtualizacao: new Date()
+        } 
+      }
+    );
+    
+    // Retornar carteira atualizada
+    const updatedWallet = await req.db.collection('carteiras').findOne({ _id: new req.ObjectId(id) });
+    res.json(updatedWallet);
+  } catch (error) {
+    console.error('Erro ao atualizar preços da carteira:', error);
+    res.status(500).json({ error: 'Erro ao atualizar preços da carteira' });
+  }
+};
+
 // Listar ativos de uma carteira
 exports.getAssets = async (req, res) => {
   try {
     const { id } = req.params;
     
     const wallet = await req.db.collection('carteiras').findOne(
-      { _id: new req.ObjectId(id) },
+      { 
+        _id: new req.ObjectId(id),
+        userId: req.userId
+      },
       { projection: { ativos: 1 } }
     );
     
@@ -270,7 +382,20 @@ exports.getAssets = async (req, res) => {
       return res.status(404).json({ error: 'Carteira não encontrada' });
     }
     
-    res.json(wallet.ativos);
+    // Atualizar preços dos ativos com base na tabela de criptomoedas
+    const updatedAtivos = await Promise.all(wallet.ativos.map(async (ativo) => {
+      const cryptoData = await req.db.collection('criptomoedas').findOne({ nome: ativo.nome });
+      if (cryptoData) {
+        return {
+          ...ativo,
+          precoAtual: cryptoData.precoAtual,
+          valorAtual: ativo.quantidade * cryptoData.precoAtual
+        };
+      }
+      return ativo;
+    }));
+    
+    res.json(updatedAtivos);
   } catch (error) {
     console.error('Erro ao listar ativos:', error);
     res.status(500).json({ error: 'Erro ao listar ativos' });
@@ -283,19 +408,39 @@ exports.getWalletBalance = async (req, res) => {
     const { id } = req.params;
     
     const wallet = await req.db.collection('carteiras').findOne(
-      { _id: new req.ObjectId(id) },
-      { projection: { saldoTotal: 1, aporteTotal: 1, lucro: 1, percentualLucro: 1 } }
+      { 
+        _id: new req.ObjectId(id),
+        userId: req.userId
+      }
     );
     
     if (!wallet) {
       return res.status(404).json({ error: 'Carteira não encontrada' });
     }
     
+    // Calcular saldo atual com base nos preços atuais das criptomoedas
+    let saldoAtual = 0;
+    
+    if (wallet.ativos && wallet.ativos.length > 0) {
+      for (const ativo of wallet.ativos) {
+        const cryptoData = await req.db.collection('criptomoedas').findOne({ nome: ativo.nome });
+        if (cryptoData) {
+          saldoAtual += ativo.quantidade * cryptoData.precoAtual;
+        } else {
+          saldoAtual += ativo.valorTotal;
+        }
+      }
+    }
+    
+    // Calcular lucro e percentual de lucro
+    const lucro = saldoAtual - wallet.aporteTotal;
+    const percentualLucro = wallet.aporteTotal > 0 ? (lucro / wallet.aporteTotal) * 100 : 0;
+    
     res.json({
-      saldoTotal: wallet.saldoTotal,
+      saldoTotal: saldoAtual,
       aporteTotal: wallet.aporteTotal,
-      lucro: wallet.lucro,
-      percentualLucro: wallet.percentualLucro
+      lucro: lucro,
+      percentualLucro: percentualLucro
     });
   } catch (error) {
     console.error('Erro ao obter saldo da carteira:', error);
@@ -310,6 +455,39 @@ exports.getAllWallets = async (req, res) => {
     const wallets = await req.db.collection('carteiras')
       .find({ userId: req.userId })
       .toArray();
+      
+    // Atualizar cada carteira com preços atuais
+    for (let wallet of wallets) {
+      if (wallet.ativos && wallet.ativos.length > 0) {
+        let saldoAtual = 0;
+        
+        for (let i = 0; i < wallet.ativos.length; i++) {
+          const ativo = wallet.ativos[i];
+          const cryptoData = await req.db.collection('criptomoedas').findOne({ nome: ativo.nome });
+          
+          if (cryptoData) {
+            wallet.ativos[i].precoAtual = cryptoData.precoAtual;
+            wallet.ativos[i].valorAtual = ativo.quantidade * cryptoData.precoAtual;
+            saldoAtual += wallet.ativos[i].valorAtual;
+          } else {
+            saldoAtual += ativo.valorTotal;
+          }
+        }
+        
+        // Recalcular percentuais
+        if (saldoAtual > 0) {
+          wallet.ativos.forEach(ativo => {
+            ativo.percentual = (ativo.valorAtual / saldoAtual) * 100;
+          });
+        }
+        
+        // Atualizar saldo total, lucro e percentual de lucro
+        wallet.saldoTotal = saldoAtual;
+        wallet.lucro = saldoAtual - wallet.aporteTotal;
+        wallet.percentualLucro = wallet.aporteTotal > 0 ? (wallet.lucro / wallet.aporteTotal) * 100 : 0;
+      }
+    }
+    
     res.json(wallets);
   } catch (error) {
     console.error('Erro ao listar carteiras:', error);
@@ -330,6 +508,36 @@ exports.getWallet = async (req, res) => {
     
     if (!wallet) {
       return res.status(404).json({ error: 'Carteira não encontrada' });
+    }
+    
+    // Atualizar preços e valores com base nos preços atuais
+    if (wallet.ativos && wallet.ativos.length > 0) {
+      let saldoAtual = 0;
+      
+      for (let i = 0; i < wallet.ativos.length; i++) {
+        const ativo = wallet.ativos[i];
+        const cryptoData = await req.db.collection('criptomoedas').findOne({ nome: ativo.nome });
+        
+        if (cryptoData) {
+          wallet.ativos[i].precoAtual = cryptoData.precoAtual;
+          wallet.ativos[i].valorAtual = ativo.quantidade * cryptoData.precoAtual;
+          saldoAtual += wallet.ativos[i].valorAtual;
+        } else {
+          saldoAtual += ativo.valorTotal;
+        }
+      }
+      
+      // Recalcular percentuais
+      if (saldoAtual > 0) {
+        wallet.ativos.forEach(ativo => {
+          ativo.percentual = (ativo.valorAtual / saldoAtual) * 100;
+        });
+      }
+      
+      // Atualizar saldo total, lucro e percentual de lucro
+      wallet.saldoTotal = saldoAtual;
+      wallet.lucro = saldoAtual - wallet.aporteTotal;
+      wallet.percentualLucro = wallet.aporteTotal > 0 ? (wallet.lucro / wallet.aporteTotal) * 100 : 0;
     }
     
     res.json(wallet);

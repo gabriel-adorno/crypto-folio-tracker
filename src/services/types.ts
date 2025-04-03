@@ -12,6 +12,8 @@ export interface Asset {
   quantidade: number;
   valorUnitario: number;
   valorTotal: number;
+  precoAtual?: number;
+  valorAtual?: number;
   percentual: number;
 }
 

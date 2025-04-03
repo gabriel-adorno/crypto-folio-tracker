@@ -4,9 +4,11 @@ import walletService from './walletService';
 import historyService from './historyService';
 import chartService from './chartService';
 import authService from './authService';
+import cryptoService from './cryptoService';
 
 // Re-export types
 export * from './types';
+export * from './cryptoService';
 
 // Combine all services into a single API object
 const api = {
@@ -14,7 +16,8 @@ const api = {
   ...walletService,
   ...historyService,
   ...chartService,
-  ...authService
+  ...authService,
+  ...cryptoService
 };
 
 export default api;
