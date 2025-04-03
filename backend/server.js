@@ -8,6 +8,7 @@ const historicoRoutes = require('./routes/historico.routes');
 const graficosRoutes = require('./routes/graficos.routes');
 const authRoutes = require('./routes/auth.routes');
 const criptoRoutes = require('./routes/cripto.routes');
+const cotacaoRoutes = require('./routes/cotacao.routes');
 const authMiddleware = require('./middleware/auth.middleware');
 
 const app = express();
@@ -157,6 +158,19 @@ async function initializeData(db) {
     await db.collection('criptomoedas').insertMany(defaultCryptos);
     console.log('Criptomoedas initialized with default values');
   }
+  
+  if (!(await db.listCollections({ name: 'cotacoes' }).hasNext())) {
+    await db.createCollection('cotacoes');
+    console.log('Cotacoes collection created');
+    
+    // Inicializar com a cotação do dólar
+    await db.collection('cotacoes').insertOne({
+      moeda: 'USD',
+      valor: 5.10, // Valor inicial do dólar
+      data: new Date()
+    });
+    console.log('Cotação do dólar inicializada');
+  }
 }
 
 // Make DB available to routes
@@ -169,6 +183,7 @@ app.use((req, res, next) => {
 // Public Routes
 app.use('/auth', authRoutes);
 app.use('/cripto', criptoRoutes);
+app.use('/cotacao', cotacaoRoutes);
 
 // Protected Routes (require authentication)
 app.use('/carteira', authMiddleware, carteiraRoutes);

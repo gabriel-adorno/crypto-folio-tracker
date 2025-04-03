@@ -1,9 +1,18 @@
 
+import { useCurrency } from '@/contexts/CurrencyContext';
+
+// Versão antiga da função formatCurrency que permanece para compatibilidade
 export const formatCurrency = (value: number): string => {
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
     currency: 'BRL',
   }).format(value);
+};
+
+// Hook para formatar moeda usando o contexto
+export const useFormatCurrency = () => {
+  const { formatCurrency } = useCurrency();
+  return formatCurrency;
 };
 
 export const formatPercentage = (value: number): string => {

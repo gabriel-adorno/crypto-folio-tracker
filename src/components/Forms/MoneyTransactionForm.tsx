@@ -4,8 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { formatCurrency } from "@/lib/formatters";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useCurrency } from "@/contexts/CurrencyContext";
 import api from "@/services/api";
 import { toast } from "sonner";
 
@@ -14,6 +14,7 @@ const MoneyTransactionForm = () => {
   const [depositAmount, setDepositAmount] = useState("");
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [userBalance, setUserBalance] = useState(0);
+  const { formatCurrency } = useCurrency();
   
   useEffect(() => {
     const fetchUserBalance = async () => {

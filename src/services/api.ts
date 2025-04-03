@@ -5,6 +5,7 @@ import historyService from './historyService';
 import chartService from './chartService';
 import authService from './authService';
 import cryptoService from './cryptoService';
+import exchangeService from './exchangeService';
 
 // Re-export types
 export * from './types';
@@ -17,7 +18,8 @@ const api = {
   ...historyService,
   ...chartService,
   ...authService,
-  ...cryptoService
+  ...cryptoService,
+  ...exchangeService
 };
 
 export default api;

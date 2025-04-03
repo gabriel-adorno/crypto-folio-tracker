@@ -1,88 +1,85 @@
 
 import { Link, useLocation } from "react-router-dom";
-import { cn } from "@/lib/utils";
-import {
-  LineChart,
-  Wallet,
-  LayoutDashboard,
-  History,
+import { 
+  LayoutDashboard, 
+  Briefcase, 
+  History, 
+  BarChart2, 
   Settings,
-  DollarSign,
-  LogOut,
+  DollarSign
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import UserInfo from "./UserInfo";
+import CurrencySwitcher from "./CurrencySwitcher";
 
 const Sidebar = () => {
   const location = useLocation();
-  const isActive = (path: string) => location.pathname === path;
+  const pathname = location.pathname;
 
-  const routes = [
+  const menuItems = [
     {
-      name: "Dashboard",
-      path: "/",
-      icon: <LayoutDashboard size={20} />,
+      label: "Dashboard",
+      icon: <LayoutDashboard className="mr-2 h-4 w-4" />,
+      path: "/"
     },
     {
-      name: "Carteiras",
-      path: "/carteiras",
-      icon: <Wallet size={20} />,
+      label: "Carteiras",
+      icon: <Briefcase className="mr-2 h-4 w-4" />,
+      path: "/carteiras"
     },
     {
-      name: "Histórico",
-      path: "/historico",
-      icon: <History size={20} />,
+      label: "Depósito/Saque",
+      icon: <DollarSign className="mr-2 h-4 w-4" />,
+      path: "/deposito-saque"
     },
     {
-      name: "Depósito/Saque",
-      path: "/deposito-saque",
-      icon: <DollarSign size={20} />,
+      label: "Histórico",
+      icon: <History className="mr-2 h-4 w-4" />,
+      path: "/historico"
     },
     {
-      name: "Relatórios",
-      path: "/relatorios",
-      icon: <LineChart size={20} />,
+      label: "Relatórios",
+      icon: <BarChart2 className="mr-2 h-4 w-4" />,
+      path: "/relatorios"
     },
     {
-      name: "Configurações",
-      path: "/configuracoes",
-      icon: <Settings size={20} />,
-    },
+      label: "Configurações",
+      icon: <Settings className="mr-2 h-4 w-4" />,
+      path: "/configuracoes"
+    }
   ];
 
   return (
-    <div className="w-64 h-screen bg-card border-r border-border flex flex-col">
-      <div className="p-6 border-b border-border">
-        <h1 className="text-xl font-bold flex items-center gap-2">
-          <span className="text-primary">Crypto</span>
-          <span className="text-secondary">Folio</span>
-        </h1>
+    <div className="h-full flex flex-col border-r bg-background">
+      <div className="p-4">
+        <h1 className="text-xl font-bold">Crypto Manager</h1>
       </div>
-
-      <nav className="flex-1 py-6 px-3">
-        <ul className="space-y-1">
-          {routes.map((route) => (
-            <li key={route.path}>
-              <Link
-                to={route.path}
-                className={cn(
-                  "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors",
-                  isActive(route.path)
-                    ? "bg-primary/10 text-primary font-medium"
-                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                )}
+      
+      <Separator />
+      
+      <UserInfo />
+      
+      <Separator />
+      
+      <div className="flex-1 overflow-auto py-2">
+        <nav className="grid gap-1 px-2">
+          {menuItems.map((item) => (
+            <Link key={item.path} to={item.path}>
+              <Button
+                variant={pathname === item.path ? "secondary" : "ghost"}
+                className="w-full justify-start"
               >
-                {route.icon}
-                {route.name}
-              </Link>
-            </li>
+                {item.icon}
+                {item.label}
+              </Button>
+            </Link>
           ))}
-        </ul>
-      </nav>
-
-      <div className="p-6 border-t border-border">
-        <button className="flex items-center gap-3 w-full px-3 py-2 rounded-md text-sm transition-colors text-muted-foreground hover:bg-destructive/10 hover:text-destructive">
-          <LogOut size={20} />
-          Sair
-        </button>
+        </nav>
+      </div>
+      
+      <div className="p-4 mt-auto">
+        <CurrencySwitcher />
       </div>
     </div>
   );

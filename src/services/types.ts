@@ -79,3 +79,19 @@ export interface LoginData {
   email: string;
   senha: string;
 }
+
+export interface Crypto {
+  nome: string;
+  simbolo: string;
+  precoAtual: number;
+  variacao24h: number;
+  marketCap: number;
+  volume24h: number;
+  ultimaAtualizacao: string;
+}
+
+export interface ExchangeRate {
+  moeda: string;
+  valor: number;
+  data: string;
+}
