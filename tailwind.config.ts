@@ -70,6 +70,7 @@ export default {
 					'red': '#ff4c4c',
 					'green': '#2ebd85',
 					'blue': '#1199fa',
+                    'primary': '#ff7b00',
 				}
 			},
 			borderRadius: {
