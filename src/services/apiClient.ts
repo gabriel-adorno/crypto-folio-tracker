@@ -22,6 +22,12 @@ export const handleApiError = (error: any, fallbackData: any = null) => {
   if (error.response) {
     // The request was made and the server responded with a status code
     errorMessage = error.response.data?.error || `Erro ${error.response.status}`;
+    
+    // Handle authentication errors
+    if (error.response.status === 401) {
+      errorMessage = 'Sessão expirada. Por favor, faça login novamente.';
+      // Could redirect to login page here
+    }
   } else if (error.request) {
     // The request was made but no response was received
     errorMessage = 'Servidor não respondeu. Verifique se o backend está em execução.';

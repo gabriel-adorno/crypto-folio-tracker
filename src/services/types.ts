@@ -1,6 +1,8 @@
 
 export interface User {
   id: string;
+  email: string;
+  nome: string;
   saldoReais: number;
   aporteTotal: number;
 }
@@ -15,6 +17,7 @@ export interface Asset {
 
 export interface Wallet {
   id: string;
+  userId: string;  // Adicionado userId para vinculação ao usuário
   nome: string;
   ativos: Asset[];
   saldoTotal: number;
@@ -25,6 +28,7 @@ export interface Wallet {
 
 export interface HistoryItem {
   id: string;
+  userId: string;  // Adicionado userId para vinculação ao usuário
   data: string;
   tipo: 'compra' | 'venda' | 'deposito' | 'saque' | 'criacao';
   descricao: string;
@@ -56,4 +60,20 @@ export interface UserOverview {
   saldoCarteiras: number;
   lucroTotal: number;
   percentualLucro: number;
+}
+
+export interface LoginResponse {
+  token: string;
+  user: User;
+}
+
+export interface RegisterData {
+  nome: string;
+  email: string;
+  senha: string;
+}
+
+export interface LoginData {
+  email: string;
+  senha: string;
 }

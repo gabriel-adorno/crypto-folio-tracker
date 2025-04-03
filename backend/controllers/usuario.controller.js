@@ -12,12 +12,13 @@ exports.deposit = async (req, res) => {
     
     // Atualizar saldo do usuário
     await req.db.collection('usuarios').updateOne(
-      {},
+      { _id: new req.ObjectId(req.userId) },
       { $inc: { saldoReais: valor } }
     );
     
     // Registrar no histórico
     await req.db.collection('historico').insertOne({
+      userId: req.userId,
       tipo: 'deposito',
       descricao: `Depositou em reais`,
       valor,
@@ -25,7 +26,9 @@ exports.deposit = async (req, res) => {
     });
     
     // Retornar usuário atualizado
-    const updatedUser = await req.db.collection('usuarios').findOne({});
+    const updatedUser = await req.db.collection('usuarios').findOne(
+      { _id: new req.ObjectId(req.userId) }
+    );
     
     res.json({
       message: `Depósito de R$ ${valor.toFixed(2)} realizado com sucesso`,
@@ -47,7 +50,7 @@ exports.withdraw = async (req, res) => {
     }
     
     // Verificar saldo disponível
-    const user = await req.db.collection('usuarios').findOne({});
+    const user = await req.db.collection('usuarios').findOne({ _id: new req.ObjectId(req.userId) });
     
     if (valor > user.saldoReais) {
       return res.status(400).json({ error: 'Saldo insuficiente para saque' });
@@ -55,12 +58,13 @@ exports.withdraw = async (req, res) => {
     
     // Atualizar saldo do usuário
     await req.db.collection('usuarios').updateOne(
-      {},
+      { _id: new req.ObjectId(req.userId) },
       { $inc: { saldoReais: -valor } }
     );
     
     // Registrar no histórico
     await req.db.collection('historico').insertOne({
+      userId: req.userId,
       tipo: 'saque',
       descricao: `Sacou em reais`,
       valor,
@@ -68,7 +72,7 @@ exports.withdraw = async (req, res) => {
     });
     
     // Retornar usuário atualizado
-    const updatedUser = await req.db.collection('usuarios').findOne({});
+    const updatedUser = await req.db.collection('usuarios').findOne({ _id: new req.ObjectId(req.userId) });
     
     res.json({
       message: `Saque de R$ ${valor.toFixed(2)} realizado com sucesso`,
@@ -84,10 +88,10 @@ exports.withdraw = async (req, res) => {
 exports.getOverview = async (req, res) => {
   try {
     // Buscar dados do usuário
-    const user = await req.db.collection('usuarios').findOne({});
+    const user = await req.db.collection('usuarios').findOne({ _id: new req.ObjectId(req.userId) });
     
-    // Buscar todas as carteiras
-    const wallets = await req.db.collection('carteiras').find({}).toArray();
+    // Buscar todas as carteiras do usuário
+    const wallets = await req.db.collection('carteiras').find({ userId: req.userId }).toArray();
     
     // Calcular totais
     const saldoCarteiras = wallets.reduce((sum, wallet) => sum + wallet.saldoTotal, 0);
@@ -111,7 +115,7 @@ exports.getOverview = async (req, res) => {
 // Obter dados do usuário
 exports.getUser = async (req, res) => {
   try {
-    const user = await req.db.collection('usuarios').findOne({});
+    const user = await req.db.collection('usuarios').findOne({ _id: new req.ObjectId(req.userId) });
     res.json(user);
   } catch (error) {
     console.error('Erro ao obter dados do usuário:', error);

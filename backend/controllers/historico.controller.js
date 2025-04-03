@@ -5,7 +5,7 @@
 exports.getHistory = async (req, res) => {
   try {
     const history = await req.db.collection('historico')
-      .find({})
+      .find({ userId: req.userId })
       .sort({ data: -1 })
       .toArray();
     

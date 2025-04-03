@@ -6,6 +6,8 @@ const carteiraRoutes = require('./routes/carteira.routes');
 const usuarioRoutes = require('./routes/usuario.routes');
 const historicoRoutes = require('./routes/historico.routes');
 const graficosRoutes = require('./routes/graficos.routes');
+const authRoutes = require('./routes/auth.routes');
+const authMiddleware = require('./middleware/auth.middleware');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -40,48 +42,17 @@ async function initializeData(db) {
   // Create collections if they don't exist
   if (!(await db.listCollections({ name: 'usuarios' }).hasNext())) {
     await db.createCollection('usuarios');
-    await db.collection('usuarios').insertOne({
-      saldoReais: 10000,
-      aporteTotal: 0
-    });
-    console.log('Usuarios collection created with initial data');
+    console.log('Usuarios collection created');
   }
   
   if (!(await db.listCollections({ name: 'carteiras' }).hasNext())) {
     await db.createCollection('carteiras');
     console.log('Carteiras collection created');
-    
-    // Add a sample wallet if none exists
-    const carteirasCount = await db.collection('carteiras').countDocuments();
-    if (carteirasCount === 0) {
-      await db.collection('carteiras').insertOne({
-        nome: "Carteira Principal",
-        ativos: [],
-        saldoTotal: 0,
-        aporteTotal: 0,
-        lucro: 0,
-        percentualLucro: 0,
-        dataCriacao: new Date()
-      });
-      console.log('Sample wallet created');
-    }
   }
   
   if (!(await db.listCollections({ name: 'historico' }).hasNext())) {
     await db.createCollection('historico');
     console.log('Historico collection created');
-    
-    // Add sample history if none exists
-    const historicoCount = await db.collection('historico').countDocuments();
-    if (historicoCount === 0) {
-      await db.collection('historico').insertOne({
-        tipo: 'deposito',
-        descricao: 'Depósito inicial em reais',
-        valor: 10000,
-        data: new Date()
-      });
-      console.log('Sample history created');
-    }
   }
 }
 
@@ -92,11 +63,14 @@ app.use((req, res, next) => {
   next();
 });
 
-// Routes
-app.use('/carteira', carteiraRoutes);
-app.use('/usuario', usuarioRoutes);
-app.use('/historico', historicoRoutes);
-app.use('/graficos', graficosRoutes);
+// Public Routes
+app.use('/auth', authRoutes);
+
+// Protected Routes (require authentication)
+app.use('/carteira', authMiddleware, carteiraRoutes);
+app.use('/usuario', authMiddleware, usuarioRoutes);
+app.use('/historico', authMiddleware, historicoRoutes);
+app.use('/graficos', authMiddleware, graficosRoutes);
 
 // Root route
 app.get('/', (req, res) => {

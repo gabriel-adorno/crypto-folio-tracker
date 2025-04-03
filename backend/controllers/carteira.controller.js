@@ -10,6 +10,7 @@ exports.createWallet = async (req, res) => {
     }
     
     const newWallet = {
+      userId: req.userId, // Associar ao usuário atual
       nome,
       ativos: [],
       saldoTotal: 0,
@@ -23,6 +24,7 @@ exports.createWallet = async (req, res) => {
     
     // Registrar no histórico
     await req.db.collection('historico').insertOne({
+      userId: req.userId, // Associar ao usuário atual
       tipo: 'criacao',
       descricao: `Criou a carteira ${nome}`,
       valor: 0,
@@ -304,7 +306,10 @@ exports.getWalletBalance = async (req, res) => {
 // Obter todas as carteiras
 exports.getAllWallets = async (req, res) => {
   try {
-    const wallets = await req.db.collection('carteiras').find({}).toArray();
+    // Filtrar carteiras pelo userId
+    const wallets = await req.db.collection('carteiras')
+      .find({ userId: req.userId })
+      .toArray();
     res.json(wallets);
   } catch (error) {
     console.error('Erro ao listar carteiras:', error);
@@ -317,7 +322,11 @@ exports.getWallet = async (req, res) => {
   try {
     const { id } = req.params;
     
-    const wallet = await req.db.collection('carteiras').findOne({ _id: new req.ObjectId(id) });
+    // Adiciona verificação de propriedade da carteira
+    const wallet = await req.db.collection('carteiras').findOne({ 
+      _id: new req.ObjectId(id),
+      userId: req.userId // Verificar se a carteira pertence ao usuário
+    });
     
     if (!wallet) {
       return res.status(404).json({ error: 'Carteira não encontrada' });
