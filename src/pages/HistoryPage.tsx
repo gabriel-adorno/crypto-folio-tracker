@@ -52,7 +52,7 @@ const HistoryPage = () => {
   }, [typeFilter, searchTerm, transactions]);
   
   return (
-    <Layout>
+    <Layout title="Histórico">
       <div className="mb-6">
         <h1 className="text-3xl font-bold mb-2">Histórico</h1>
         <p className="text-muted-foreground">

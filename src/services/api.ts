@@ -9,7 +9,10 @@ import exchangeService from './exchangeService';
 
 // Re-export types
 export * from './types';
-export * from './cryptoService';
+
+// Explicitly re-export Crypto type from cryptoService to avoid ambiguity
+import { Crypto } from './cryptoService';
+export { Crypto };
 
 // Combine all services into a single API object
 const api = {

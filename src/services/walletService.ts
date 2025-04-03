@@ -9,6 +9,7 @@ const walletService = {
       const response = await apiClient.get('/carteira');
       return response.data.map((wallet: any) => ({
         id: wallet._id,
+        userId: wallet.userId || "", // Ensure userId is always set
         nome: wallet.nome,
         ativos: wallet.ativos || [],
         saldoTotal: wallet.saldoTotal,
@@ -26,6 +27,7 @@ const walletService = {
       const response = await apiClient.get(`/carteira/${id}`);
       return {
         id: response.data._id,
+        userId: response.data.userId || "", // Ensure userId is always set
         nome: response.data.nome,
         ativos: response.data.ativos || [],
         saldoTotal: response.data.saldoTotal,
@@ -44,6 +46,7 @@ const walletService = {
       toast.success(`Carteira "${name}" criada com sucesso!`);
       return {
         id: response.data.id,
+        userId: response.data.userId || "", // Ensure userId is always set
         nome: response.data.nome,
         ativos: response.data.ativos || [],
         saldoTotal: response.data.saldoTotal,

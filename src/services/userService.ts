@@ -9,6 +9,8 @@ const userService = {
       const response = await apiClient.get('/usuario');
       return {
         id: response.data._id,
+        email: response.data.email || "",
+        nome: response.data.nome || "",
         saldoReais: response.data.saldoReais,
         aporteTotal: response.data.aporteTotal
       };

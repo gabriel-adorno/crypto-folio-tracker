@@ -1,14 +1,10 @@
 
 import React, { useEffect, useState } from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import api from '@/services/api';
 import { User } from '@/services/types';
 
-interface AuthGuardProps {
-  children: React.ReactNode;
-}
-
-const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
+const AuthGuard: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
   const location = useLocation();
@@ -42,7 +38,7 @@ const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
     return <Navigate to="/auth" state={{ from: location }} replace />;
   }
 
-  return <>{children}</>;
+  return <Outlet />;
 };
 
 export default AuthGuard;

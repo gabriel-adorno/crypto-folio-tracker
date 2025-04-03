@@ -28,7 +28,7 @@ const WalletsPage = () => {
   }, []);
 
   return (
-    <Layout>
+    <Layout title="Carteiras">
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-3xl font-bold mb-2">Carteiras</h1>

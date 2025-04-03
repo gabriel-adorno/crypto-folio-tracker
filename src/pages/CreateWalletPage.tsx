@@ -7,7 +7,7 @@ import { ChevronLeft } from "lucide-react";
 
 const CreateWalletPage = () => {
   return (
-    <Layout>
+    <Layout title="Nova Carteira">
       <Button variant="ghost" asChild className="mb-6">
         <Link to="/carteiras">
           <ChevronLeft className="h-4 w-4 mr-2" />

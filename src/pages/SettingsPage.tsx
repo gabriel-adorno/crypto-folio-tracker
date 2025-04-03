@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 
 const SettingsPage = () => {
   return (
-    <Layout>
+    <Layout title="Configurações">
       <div className="mb-6">
         <h1 className="text-3xl font-bold mb-2">Configurações</h1>
         <p className="text-muted-foreground">
