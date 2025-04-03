@@ -27,20 +27,17 @@ function App() {
         <Router>
           <Toaster />
           <Routes>
+            {/* All routes are directly accessible without authentication */}
             <Route path="/auth" element={<AuthPage />} />
-            
-            <Route element={<AuthGuard />}>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/carteiras" element={<WalletsPage />} />
-              <Route path="/carteiras/:id" element={<WalletDetailsPage />} />
-              <Route path="/carteiras/nova" element={<CreateWalletPage />} />
-              <Route path="/carteiras/:id/adicionar" element={<AddAssetPage />} />
-              <Route path="/historico" element={<HistoryPage />} />
-              <Route path="/relatorios" element={<ReportsPage />} />
-              <Route path="/configuracoes" element={<SettingsPage />} />
-              <Route path="/deposito-saque" element={<DepositWithdrawPage />} />
-            </Route>
-            
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/carteiras" element={<WalletsPage />} />
+            <Route path="/carteiras/:id" element={<WalletDetailsPage />} />
+            <Route path="/carteiras/nova" element={<CreateWalletPage />} />
+            <Route path="/carteiras/:id/adicionar" element={<AddAssetPage />} />
+            <Route path="/historico" element={<HistoryPage />} />
+            <Route path="/relatorios" element={<ReportsPage />} />
+            <Route path="/configuracoes" element={<SettingsPage />} />
+            <Route path="/deposito-saque" element={<DepositWithdrawPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Router>

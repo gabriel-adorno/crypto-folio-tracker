@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LogOut, User } from 'lucide-react';
 import { Button } from "@/components/ui/button";
@@ -9,30 +9,21 @@ import api from '@/services/api';
 import { User as UserType } from '@/services/types';
 
 const UserInfo = () => {
-  const [user, setUser] = useState<UserType | null>(null);
-  const navigate = useNavigate();
+  // Mock user data for direct access without authentication
+  const [user] = useState<UserType>({
+    id: 'mock-user-id',
+    nome: 'Usuário Demo',
+    email: 'demo@exemplo.com',
+    saldoReais: 10000,
+    aporteTotal: 5000
+  });
   
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const userData = await api.getCurrentUser();
-        setUser(userData);
-      } catch (error) {
-        console.error('Failed to fetch user data:', error);
-      }
-    };
-    
-    fetchUser();
-  }, []);
+  const navigate = useNavigate();
   
   const handleLogout = () => {
     api.logout();
     navigate('/auth');
   };
-  
-  if (!user) {
-    return null;
-  }
   
   // Get initials for avatar
   const getInitials = (name: string) => {
